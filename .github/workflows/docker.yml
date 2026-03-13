@@ -1,76 +1,81 @@
-# Nom du workflow affiché dans l'onglet Actions de GitHub
+# Nom du pipeline visible dans l'onglet Actions de GitHub
 name: Python CI/CD Pipeline
 
-# Déclenchement du workflow
+# Déclenchement du pipeline
 on:
-  # Exécution lorsqu'on pousse du code
+  # Exécution lorsque du code est envoyé (push)
   push:
-    branches: [ main ]
+    branches:
+      - main
 
-  # Exécution lorsqu'une Pull Request est créée ou modifiée
+  # Exécution lorsqu'une pull request est créée ou modifiée
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
-# Définition des tâches (jobs)
+
+# Définition des jobs
 jobs:
 
-  # =========================
-  # JOB 1 : CI (qualité du code + tests)
-  # =========================
+  # ---------------------------
+  # JOB 1 : CONTINUOUS INTEGRATION
+  # ---------------------------
   ci:
 
-    # Machine virtuelle fournie par GitHub
+    # Machine virtuelle utilisée par GitHub
     runs-on: ubuntu-latest
 
     steps:
 
-      # Étape 1 : récupérer le code du dépôt
+      # Récupère le code du dépôt
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Étape 2 : installer Python sur la machine virtuelle
+      # Installe Python sur la machine virtuelle
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
-      # Étape 3 : installer les dépendances du projet
+      # Installe les dépendances du projet
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Étape 4 : vérifier la qualité du code (clean code)
-      # flake8 est un outil d'analyse de style Python
-      - name: Run code quality check
+      # Vérifie la qualité du code (clean code)
+      # flake8 analyse le style, les erreurs et les mauvaises pratiques
+      - name: Code quality check
         run: |
           pip install flake8
           flake8 .
 
-      # Étape 5 : exécuter les tests automatiques
+      # Compilation Python (vérification syntaxe)
+      # compile tous les fichiers python
+      - name: Compile Python files
+        run: |
+          python -m compileall .
+
+      # Lance les tests automatiques
       - name: Run tests
         run: |
           pip install pytest
           pytest
 
-      # Étape 6 : produire un artefact (ex : zip du projet)
-      - name: Create artifact
-        run: |
-          zip -r clinicstock-build.zip .
-
-      # Étape 7 : envoyer l’artefact dans GitHub
+      # Produit un artefact (ex: code compilé ou package)
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: clinicstock-build
-          path: clinicstock-build.zip
+          name: python-build
+          path: .
 
-  # =========================
-  # JOB 2 : CD (Docker)
-  # =========================
-  docker:
 
-    # Ce job s'exécute seulement si le job CI réussit
+  # ---------------------------
+  # JOB 2 : CONTINUOUS DEPLOYMENT
+  # ---------------------------
+  cd:
+
+    # Ce job s'exécute seulement si le job CI a réussi
     needs: ci
 
     # Machine virtuelle utilisée
@@ -78,21 +83,21 @@ jobs:
 
     steps:
 
-      # Étape 1 : récupérer le code du dépôt
+      # Récupère le code
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Étape 2 : connexion à Docker Hub avec les secrets GitHub
+      # Connexion à Docker Hub
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Étape 3 : construire l'image Docker
+      # Construction de l'image Docker
       - name: Build Docker image
         run: docker build -t angelangassam/clinicstock .
 
-      # Étape 4 : publier l'image sur Docker Hub
+      # Publication de l'image Docker sur Docker Hub
       - name: Push Docker image
         run: docker push angelangassam/clinicstock
